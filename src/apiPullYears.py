@@ -3,33 +3,32 @@ import pandas as pd
 from datetime import datetime
 import os
 
-# Create output directory
-output_dir = "./data/years/"
-os.makedirs(output_dir, exist_ok=True)
-
-# Ticker for S&P 500 Index
+# Ticker for S&P 500 index
 sp500 = yf.Ticker("^GSPC")
 
-# Loop through years
-for year in range(2005, 2016):
-    # Define start and end of year
+# Years you want
+for year in range(2010, 2020):  # Looping through years 2010 to 2019
+    # Start and end dates for the year
     start_date = datetime(year, 1, 1)
     end_date = datetime(year + 1, 1, 1)
 
-    # Download daily data for the year
-    hist = sp500.history(start=start_date.strftime("%Y-%m-%d"),
-                         end=end_date.strftime("%Y-%m-%d"))
+    # Get historical data
+    hist = sp500.history(start=start_date.strftime('%Y-%m-%d'),
+                         end=end_date.strftime('%Y-%m-%d'))
 
-    # Reset index to access date column
-    hist = hist.reset_index()
+    # Resample data by week and sum the volume
+    weekly_data = hist[['Volume']].resample('W').sum()
 
-    # Create 'Date' column in format YYYY-MM
-    hist['Date'] = hist['Date'].dt.to_period('M').astype(str)
+    # Ensure we are only including complete weeks (from Sunday to Saturday)
+    weekly_data = weekly_data[weekly_data.index.weekday == 6]  # Keep only weeks starting on Sunday
 
-    # Group by 'Date' and sum the volume
-    monthly_volume = hist.groupby('Date')['Volume'].sum().reset_index()
+    if not weekly_data.empty:
+        # Prepare the directory to save the CSV
+        filename = f"./data/years/sp500_volume_{year}.csv"
+        os.makedirs(os.path.dirname(filename), exist_ok=True)
 
-    # Save to CSV file
-    filename = f"{output_dir}/sp500_volume_{year}.csv"
-    monthly_volume.to_csv(filename, index=False)
-    print(f"Saved: {filename}")
+        # Save the entire year's weekly volume data to a single CSV
+        weekly_data.to_csv(filename, header=True)
+        print(f"Saved: {filename}")
+    else:
+        print(f"No complete weekly data to save for {year}.")
