@@ -22,13 +22,13 @@ for label, (start_year, end_year) in decades.items():
     hist = sp500.history(start=f"{start_year}-01-01", end=f"{end_year+1}-01-01")
     hist = hist.reset_index()
 
-    # Extract year from date
-    hist['Date'] = hist['Date'].dt.year
+    # Extract year and month from date
+    hist['Year-Month'] = hist['Date'].dt.to_period('M')  # 'M' gives Year-Month period format
 
-    # Group by year and sum volume
-    yearly_volume = hist.groupby('Date')['Volume'].sum().reset_index()
+    # Group by Year-Month and sum volume
+    monthly_volume = hist.groupby('Year-Month')['Volume'].sum().reset_index()
 
     # Save to CSV
     filename = f"{output_dir}/sp500_volume_{label}.csv"
-    yearly_volume.to_csv(filename, index=False)
+    monthly_volume.to_csv(filename, index=False)
     print(f"Saved: {filename}")
