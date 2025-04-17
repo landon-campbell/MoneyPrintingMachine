@@ -9,7 +9,7 @@ import os
 sp500 = yf.Ticker("^GSPC")
 
 # Years you want
-for year in [2021, 2024]:
+for year in range(2010,2025):
     for month in range(1, 13):
         start_date = datetime(year, month, 1)
         if month == 12:
@@ -24,10 +24,10 @@ for year in [2021, 2024]:
         # Extract volume column
         volume_data = hist[['Volume']]
 
-        os.makedirs(f"./data/months/{year}", exist_ok=True)
+        os.makedirs(f"./data/2010-2014 volume per day/{year}", exist_ok=True)
 
         # Create file name
-        filename = f"./data/months/{year}/sp500_volume_{year}_{month:02}.csv"
+        filename = f"./data/2010-2014 volume per day/{year}/sp500_volume_{year}_{month:02}.csv"
 
         # Save to CSV
         volume_data.to_csv(filename)
