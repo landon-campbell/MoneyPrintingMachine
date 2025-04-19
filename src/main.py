@@ -1,43 +1,50 @@
-from datetime import datetime
+from __future__ import annotations
+
 import numpy as np
 import pandas as pd
+from collections import Counter
 
-from config import TICKERS
-from preprocess import load_raw, resample_volume, log_detrend
-from fourier import fft_mag, average_ffts, top_k, reconstruct_signal
-from metrics import mse
-from plots import plot_spectrum, plot_reconstruction
+from .config      import TICKERS
+from .preprocess  import load_raw, log_detrend
+from .fourier     import fft_mag, average_ffts, top_k
+from .plots       import plot_spectrum
 
-TAG = "SP500"
-raw = load_raw(TAG, "30m")
 
-# Split by day
-daily_groups = [g["Volume"] for _, g in raw.groupby(raw.index.date)]
+def _get_volume_column(df: pd.DataFrame) -> pd.Series:
+    for col in ("Volume", "volume"):
+        if col in df.columns:
+            return df[col]
+    raise KeyError("No volume column found in DataFrame.")
 
-f_list, m_list = [], []
-for day in daily_groups:
-    ser = pd.Series(day.values, index=np.arange(len(day)))
-    f, m = fft_mag(log_detrend(ser))
-    f_list.append(f)
-    m_list.append(m)
 
-avg_mag = average_ffts(m_list)
-freqs   = f_list[0]              # all same length
-plot_spectrum(freqs, avg_mag, f"{TAG} average DAILY spectrum")
+def run_pipeline() -> None:
+    tag = "SP500"                       # analyse SPY minute bars
+    raw = load_raw(tag, "intraday")
 
-print("Top-5 daily frequencies:", top_k(freqs, avg_mag, 5))
+    # split into individual trading days
+    day_series = [
+        _get_volume_column(group)
+        for _, group in raw.groupby(raw.index.date)
+    ]
 
-# Simple reconstruction with top‑N components
-N = 5
-idx = np.argsort(avg_mag)[::-1][:N]
-phase_template = np.angle(np.fft.rfft(log_detrend(daily_groups[-1])))  # last day
-mag_sel   = np.zeros_like(avg_mag)
-phase_sel = np.zeros_like(phase_template)
-mag_sel[idx]   = avg_mag[idx]
-phase_sel[idx] = phase_template[idx]
-recon = reconstruct_signal(mag_sel, phase_sel, len(daily_groups[-1]))
+    # keep only days with the **modal length** (usually 390 minutes)
+    lengths = [len(s) for s in day_series]
+    mode_len = Counter(lengths).most_common(1)[0][0]
+    full_days = [s for s in day_series if len(s) == mode_len]
 
-real_last = pd.Series(daily_groups[-1].values)
-pred_last = pd.Series(recon)
-print("MSE last day:", mse(real_last, pred_last))
-plot_reconstruction(real_last, pred_last, "Last day reconstruction")
+    freqs, mags = [], []
+    for day in full_days:
+        series = pd.Series(day.values, index=np.arange(len(day)))
+        f, m = fft_mag(log_detrend(series))
+        freqs.append(f)
+        mags.append(m)
+
+    avg_mag = average_ffts(mags)
+    plot_spectrum(freqs[0], avg_mag, f"{tag} – average daily spectrum")
+
+    print("Processed days:", len(full_days), "of", len(day_series))
+    print("Top‑5 daily harmonics:", top_k(freqs[0], avg_mag, 5))
+
+
+if __name__ == "__main__":
+    run_pipeline()
