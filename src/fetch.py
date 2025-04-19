@@ -27,10 +27,7 @@ def _save(df: pd.DataFrame, tag: str, suffix: str) -> Path:
     return fn
 
 
-def _yahoo_bars(symbol: str,
-                interval: str,
-                start: str | None = None,
-                end: str | None = None) -> pd.DataFrame:
+def _yahoo_bars(symbol: str, interval: str, start: str | None = None, end: str | None = None) -> pd.DataFrame:
     df = yf.download(
         symbol,
         interval=interval,
@@ -43,10 +40,7 @@ def _yahoo_bars(symbol: str,
     return df
 
 
-def _alpaca_bars(symbol: str,
-                 timeframe: TimeFrame,
-                 start: str,
-                 end: str) -> pd.DataFrame:
+def _alpaca_bars(symbol: str, timeframe: TimeFrame, start: str, end: str) -> pd.DataFrame:
     client = StockHistoricalDataClient(ALPACA_KEY, ALPACA_SECRET)
     req = StockBarsRequest(
         symbol_or_symbols=symbol,
@@ -64,10 +58,7 @@ def _alpaca_bars(symbol: str,
     return bars
 
 
-def fetch_one(tag: str,
-              symbol: str,
-              *,
-              daily_start: str = "1980-01-01") -> None:
+def fetch_one(tag: str, symbol: str, *, daily_start: str = "1980-01-01") -> None:
     today = datetime.today().strftime("%Y-%m-%d")
 
     daily_df = _yahoo_bars(symbol, "1d", daily_start, today)

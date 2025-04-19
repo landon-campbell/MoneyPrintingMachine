@@ -7,8 +7,7 @@ def _minutes_for_harmonics(harmonics, samples_per_day):
     # period (minutes) = 1 / (cycles per minute)
     # cycles per minute = harmonics / (samples_per_day / 390)
     with np.errstate(divide="ignore", invalid="ignore"):
-        return np.where(
-            harmonics == 0,
+        return np.where(harmonics == 0,
             np.nan,
             (samples_per_day / harmonics),
         )
@@ -48,13 +47,10 @@ def plot_spectrum(freqs: np.ndarray,
     plt.show()
 
 
-def plot_reconstruction(real_series: pd.Series,
-                        pred_series: pd.Series,
-                        title: str):
+def plot_reconstruction(real_series: pd.Series, pred_series: pd.Series, title: str):
     plt.figure()
     plt.plot(real_series.index, real_series.values, label="actual")
-    plt.plot(pred_series.index, pred_series.values,
-             label="reconstruction", linestyle="--")
+    plt.plot(pred_series.index, pred_series.values, label="reconstruction", linestyle="--")
     plt.legend()
     plt.title(title)
     plt.tight_layout()
