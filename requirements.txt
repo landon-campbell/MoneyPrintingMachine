@@ -1,0 +1,9 @@
+numpy>=1.26
+pandas>=2.2
+scipy>=1.12
+matplotlib>=3.9
+yfinance>=0.2
+tqdm>=4.66
+python-dotenv>=1.0
+# Alpaca only needed if PRISM_USE_ALPACA is True
+alpaca-py>=0.10
