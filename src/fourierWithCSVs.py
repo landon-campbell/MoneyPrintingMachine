@@ -9,8 +9,8 @@ import matplotlib.ticker as ticker
 
 
 # === CONFIG ===
-input_dir = 'data/volume per day/'
-output_dir = 'output/'
+input_dir = 'data/amazon volume per day/'
+output_dir = 'output/amazon/'
 fft_plot_file = os.path.join(output_dir, 'fft_spectrum.png')
 decomp_plot_file = os.path.join(output_dir, 'seasonal_decomposition')
 periods_csv_file = os.path.join(output_dir, 'significant_periods.csv')
