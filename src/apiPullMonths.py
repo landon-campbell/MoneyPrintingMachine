@@ -6,7 +6,9 @@ from datetime import datetime
 import os
 
 # Ticker for S&P 500 index
-sp500 = yf.Ticker("^GSPC")
+symbol = "AMZN"
+sp500 = yf.Ticker(symbol)
+index = "amazon"
 
 # Years you want
 for year in range(2010,2025):
@@ -24,10 +26,10 @@ for year in range(2010,2025):
         # Extract volume column
         volume_data = hist[['Volume']]
 
-        os.makedirs(f"./data/2010-2014 volume per day/{year}", exist_ok=True)
+        os.makedirs(f"./data/{index} volume per day/{year}", exist_ok=True)
 
         # Create file name
-        filename = f"./data/2010-2014 volume per day/{year}/sp500_volume_{year}_{month:02}.csv"
+        filename = f"./data/{index} volume per day/{year}/{symbol}_volume_{year}_{month:02}.csv"
 
         # Save to CSV
         volume_data.to_csv(filename)
