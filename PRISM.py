@@ -20,7 +20,8 @@ def fetch_volume(ticker: str, start: str, end: str) -> pd.Series:
                      progress=False, auto_adjust=False)
     vol = df["Volume"].dropna().sort_index()
     vol.index = pd.to_datetime(vol.index)
-    return vol.asfreq("B").ffill()
+    # reindex to every calendar day, fill non-trading days with 0
+    return vol.asfreq("D").fillna(0)
 
 
 def low_pass_filter(data, cutoff, fs=1.0, requested_taps=101):
@@ -67,91 +68,62 @@ def plot_fft(vol_series: pd.Series,
 
     N = len(filt)
     fft_vals = np.fft.fft(filt)
-    freq = np.fft.fftfreq(N, d=1.0)
+    freq = np.fft.fftfreq(N, d=1.0)  # now d=1 calendar day
 
     pos = freq > 0
     freq_pos = freq[pos]
     fft_pos = fft_vals[pos]
 
     power = np.abs(fft_pos)
-    periods = 1.0 / freq_pos
+    periods = 1.0 / freq_pos          # in calendar days
 
     mask = periods <= max_period_days
     freq2 = freq_pos[mask]
     power2 = power[mask]
-    cal2 = periods[mask] * (7.0/5.0)
+    period_plot = periods[mask]
 
     # drop first and last bins
     freq_plot = freq2[1:-1]
     power_plot = power2[1:-1]
-    cal_plot = cal2[1:-1]
+    period_plot = period_plot[1:-1]
 
     # truncate to max 3-year period (1095 days)
-    keep = cal_plot <= (3 * 365)
+    keep = period_plot <= (3 * 365)
     freq_plot = freq_plot[keep]
     power_plot = power_plot[keep]
-    cal_plot = cal_plot[keep]
+    period_plot = period_plot[keep]
 
     plt.figure(figsize=(12,6))
-
-    # shade removed high-frequency band
-    # plt.axvspan(cutoff_freq, freq_plot.max(),
-    #             color='gray', alpha=0.2,
-    #             label='Removed: period < 2 d (data constraint)')
-    # plt.axvline(cutoff_freq, color='gray', linestyle='--', linewidth=1)
-    # plt.text(cutoff_freq*1.02, plt.ylim()[1]*0.5,
-    #          '2 d period cutoff', rotation=90,
-    #          va='center', fontsize=8, color='gray')
-
     plt.plot(freq_plot, power_plot, lw=1)
 
     # split peaks around 45-day threshold
     threshold_days = 45.0
     peaks, _ = find_peaks(power_plot)
-    high_peaks = [p for p in peaks if cal_plot[p] < threshold_days]
-    low_peaks = [p for p in peaks if cal_plot[p] >= threshold_days]
+    high_peaks = [p for p in peaks if period_plot[p] < threshold_days]
+    low_peaks = [p for p in peaks if period_plot[p] >= threshold_days]
 
     # sort candidates by descending magnitude
     high_sorted = sorted(high_peaks, key=lambda p: power_plot[p], reverse=True)
     low_sorted = sorted(low_peaks, key=lambda p: power_plot[p], reverse=True)
 
     # greedy select 4 high-frequency (<45d) and 5 low-frequency (>=45d) peaks
-    selected_high = greedy_select(high_sorted, power_plot, cal_plot, 4)
-    selected_low = greedy_select(low_sorted, power_plot, cal_plot, 5)
+    selected_high = greedy_select(high_sorted, power_plot, period_plot, 4)
+    selected_low = greedy_select(low_sorted, power_plot, period_plot, 5)
     top = np.array(selected_high + selected_low)
     top = top[np.argsort(freq_plot[top])]
 
-    colors = ["red", "purple"]
-    for i, idx in enumerate(top):
-        days = cal_plot[idx]
-        # revised labeling: <30 days => weeks; 30<=d<=366 => months; >366 => years
-        # if days > 366:
-        #     label = f"{days:.1f} d ({days/365:.1f} yrs)"
-        # elif days >= 30:
-        #     mo = days / 30.0
-        #     label = f"{days:.1f} d ({mo:.1f} mo)"
-        # else:
-        # wk = days / 7.0
-        # label = f"{days:.1f} d ({wk:.1f} wks)"
+    for idx in top:
+        days = period_plot[idx]
         label = f"{days:.1f}d"
-        yoff = 8 if (i % 2 == 0) else -12
-        col = "black"
-
         plt.scatter(freq_plot[idx], power_plot[idx], color="red", zorder=5, s=15)
         plt.annotate(label,
                      (freq_plot[idx], power_plot[idx]),
                      textcoords="offset points",
-                     xytext=(0, 5),  # slight upward offset
+                     xytext=(0, 5),
                      ha="center",
-                     va="bottom",     # anchor from the bottom (so it sits above)
-                     fontsize=8,      # smaller text
-                     rotation=45,
-                     color="black")
-
-    # plt.text(0.025, 0.025,
-    #          "Fundamental decade-long cycle removed",
-    #          transform=plt.gca().transAxes,
-    #          va="bottom", fontsize=8, color="gray")
+                     va="bottom",
+                     fontsize=8,
+                     rotation=45)
 
     plt.title(f"{title.splitlines()[0]}\n"
               "Low-pass < 2-day period\n"
@@ -160,22 +132,21 @@ def plot_fft(vol_series: pd.Series,
     plt.xlabel("1/days (log scale)")
     plt.ylabel("Amplitude")
     plt.grid(alpha=0.3, which="both", linestyle="--")
-    # plt.legend(loc="lower left")
 
+    # now mark known calendar-day cycles
     known_periods = {
-        "Weekly": 5,
-        "Monthly": 21,
-        "Quarterly": 65,
-        "Semiannual": 130,
-        "Yearly": 261,
-        "Biyearly" : 521
+        "Weekly":    7,
+        "Monthly":  30,
+        "Quarter":  91,
+        "Semiannual": 182,
+        "Yearly":   365,
+        "Biennial": 730
     }
     ax = plt.gca()
-
     for label, days in known_periods.items():
-        freq = 1 / days
-        ax.axvline(freq, color='gray', linestyle='--', alpha=0.6, lw=1)
-        ax.text(freq, 0.95, label,
+        f = 1 / days
+        ax.axvline(f, color='gray', linestyle='--', alpha=0.6, lw=1)
+        ax.text(f, 0.95, label,
                 rotation=90, va='top', ha='right',
                 fontsize=9, color='gray',
                 transform=ax.get_xaxis_transform())
@@ -198,6 +169,7 @@ def main():
              title=f"{ticker} Daily Volume FFT (2014–2024)",
              max_period_days=3650,
              cutoff_freq=cutoff)
+
 
 if __name__ == "__main__":
     main()
