@@ -174,9 +174,9 @@ def plot_fft(vol_series: pd.Series,
 
     for label, days in known_periods.items():
         freq = 1 / days
-        ax.axvline(freq, color='gray', linestyle='--', alpha=0.6)
+        ax.axvline(freq, color='gray', linestyle='--', alpha=0.6, lw=1)
         ax.text(freq, 0.95, label,
-                rotation=90, va='top', ha='center',
+                rotation=90, va='top', ha='right',
                 fontsize=9, color='gray',
                 transform=ax.get_xaxis_transform())
 
