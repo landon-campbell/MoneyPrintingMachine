@@ -6,4 +6,5 @@ yfinance>=0.2
 tqdm>=4.66
 python-dotenv>=1.0
 alpaca-py>=0.10
-statsmodels>0.14.4
+statsmodels>=0.14.4
+pandas-market-calendars>=4.3

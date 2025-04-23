@@ -1,10 +1,12 @@
 # MoneyPrintingMachine
 
-To run this code:
+# 1. install deps
+pip install -r requirements.txt
 
-# pip install -r requirements.txt 
-# python -m src.fetch
-# python -m src.main   
+# 2. install local package
+python -m pip install -e .
 
+# 3. execute
+python -m prism.cli --ticker AMZN
 
-For zach implmentation: apiPull fetches the data
+REPLACE AMZN WITH ANY OTHER TICKER THAT EXISTS
