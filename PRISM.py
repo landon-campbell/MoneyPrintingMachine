@@ -125,30 +125,33 @@ def plot_fft(vol_series: pd.Series,
     for i, idx in enumerate(top):
         days = cal_plot[idx]
         # revised labeling: <30 days => weeks; 30<=d<=366 => months; >366 => years
-        if days > 366:
-            label = f"{days:.1f} d ({days/365:.1f} yrs)"
-        elif days >= 30:
-            mo = days / 30.0
-            label = f"{days:.1f} d ({mo:.1f} mo)"
-        else:
-            wk = days / 7.0
-            label = f"{days:.1f} d ({wk:.1f} wks)"
-
+        # if days > 366:
+        #     label = f"{days:.1f} d ({days/365:.1f} yrs)"
+        # elif days >= 30:
+        #     mo = days / 30.0
+        #     label = f"{days:.1f} d ({mo:.1f} mo)"
+        # else:
+        # wk = days / 7.0
+        # label = f"{days:.1f} d ({wk:.1f} wks)"
+        label = f"{days:.1f}d"
         yoff = 8 if (i % 2 == 0) else -12
-        col = colors[i % 2]
+        col = "black"
 
         plt.scatter(freq_plot[idx], power_plot[idx], color=col, zorder=5)
         plt.annotate(label,
                      (freq_plot[idx], power_plot[idx]),
                      textcoords="offset points",
-                     xytext=(0, yoff),
+                     xytext=(0, 5),  # slight upward offset
                      ha="center",
+                     va="bottom",     # anchor from the bottom (so it sits above)
+                     fontsize=8,      # smaller text
+                     rotation=45,
                      color=col)
 
-    plt.text(0.05, 0.95,
+    plt.text(0.025, 0.025,
              "Fundamental decade-long cycle removed",
              transform=plt.gca().transAxes,
-             va="top", fontsize=8, color="gray")
+             va="bottom", fontsize=8, color="gray")
 
     plt.title(f"{title.splitlines()[0]}\n"
               "Low-pass < 2-day period\n"
@@ -157,18 +160,7 @@ def plot_fft(vol_series: pd.Series,
     plt.xlabel("1/days (log scale)")
     plt.ylabel("Amplitude")
     plt.grid(alpha=0.3, which="both", linestyle="--")
-    plt.legend(loc="lower left")
-
-
-    ax = plt.gca()
-    ax_top = ax.twiny()
-    ax_top.set_xscale('log')
-    ax_top.set_xlim(ax.get_xlim())
-    freq_ticks = np.geomspace(freq_plot.min(), freq_plot.max(), num=6)
-    period_labels = [f"{1.0/f:.0f}" for f in freq_ticks]
-    ax_top.set_xticks(freq_ticks)
-    ax_top.set_xticklabels(period_labels)
-    ax_top.set_xlabel("Period (days)")
+    # plt.legend(loc="lower left")
 
     known_periods = {
         "Weekly": 5,
@@ -178,15 +170,15 @@ def plot_fft(vol_series: pd.Series,
         "Yearly": 261,
         "Biyearly" : 521
     }
-    max_y = np.max(vol_series)
+    ax = plt.gca()
 
     for label, days in known_periods.items():
         freq = 1 / days
-        plt.axvline(freq, color='gray', linestyle='--', alpha=0.6)
-        plt.text(freq, 0.95, label,
-            rotation=90, va='top', ha='right',
-            fontsize=9, color='gray',
-            transform=ax.get_xaxis_transform())
+        ax.axvline(freq, color='gray', linestyle='--', alpha=0.6)
+        ax.text(freq, 0.95, label,
+                rotation=90, va='top', ha='center',
+                fontsize=9, color='gray',
+                transform=ax.get_xaxis_transform())
 
     plt.tight_layout()
     plt.show()
