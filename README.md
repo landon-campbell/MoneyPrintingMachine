@@ -4,6 +4,6 @@
 pip install -r requirements.txt
 
 # 2. execute
-pytho
+python PRISM.py --ticker AMZN
 
-REPLACE AMZN WITH ANY OTHER TICKER THAT EXISTS
+Replace `AMZN` with the ticker of your choice. Try `AAPL`, `MSFT`, `GOOGL`, `TSLA`, etc.
