@@ -158,6 +158,36 @@ def plot_fft(vol_series: pd.Series,
     plt.ylabel("Amplitude")
     plt.grid(alpha=0.3, which="both", linestyle="--")
     plt.legend(loc="lower left")
+
+
+    ax = plt.gca()
+    ax_top = ax.twiny()
+    ax_top.set_xscale('log')
+    ax_top.set_xlim(ax.get_xlim())
+    freq_ticks = np.geomspace(freq_plot.min(), freq_plot.max(), num=6)
+    period_labels = [f"{1.0/f:.0f}" for f in freq_ticks]
+    ax_top.set_xticks(freq_ticks)
+    ax_top.set_xticklabels(period_labels)
+    ax_top.set_xlabel("Period (days)")
+
+    known_periods = {
+        "Weekly": 5,
+        "Monthly": 21,
+        "Quarterly": 65,
+        "Semiannual": 130,
+        "Yearly": 261,
+        "Biyearly" : 521
+    }
+    max_y = np.max(vol_series)
+
+    for label, days in known_periods.items():
+        freq = 1 / days
+        plt.axvline(freq, color='gray', linestyle='--', alpha=0.6)
+        plt.text(freq, 0.95, label,
+            rotation=90, va='top', ha='right',
+            fontsize=9, color='gray',
+            transform=ax.get_xaxis_transform())
+
     plt.tight_layout()
     plt.show()
 
