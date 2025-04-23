@@ -95,13 +95,13 @@ def plot_fft(vol_series: pd.Series,
     plt.figure(figsize=(12,6))
 
     # shade removed high-frequency band
-    plt.axvspan(cutoff_freq, freq_plot.max(),
-                color='gray', alpha=0.2,
-                label='Removed: period < 2 d (data constraint)')
-    plt.axvline(cutoff_freq, color='gray', linestyle='--', linewidth=1)
-    plt.text(cutoff_freq*1.02, plt.ylim()[1]*0.5,
-             '2 d period cutoff', rotation=90,
-             va='center', fontsize=8, color='gray')
+    # plt.axvspan(cutoff_freq, freq_plot.max(),
+    #             color='gray', alpha=0.2,
+    #             label='Removed: period < 2 d (data constraint)')
+    # plt.axvline(cutoff_freq, color='gray', linestyle='--', linewidth=1)
+    # plt.text(cutoff_freq*1.02, plt.ylim()[1]*0.5,
+    #          '2 d period cutoff', rotation=90,
+    #          va='center', fontsize=8, color='gray')
 
     plt.plot(freq_plot, power_plot, lw=1)
 
@@ -137,7 +137,7 @@ def plot_fft(vol_series: pd.Series,
         yoff = 8 if (i % 2 == 0) else -12
         col = "black"
 
-        plt.scatter(freq_plot[idx], power_plot[idx], color=col, zorder=5)
+        plt.scatter(freq_plot[idx], power_plot[idx], color="red", zorder=5, s=15)
         plt.annotate(label,
                      (freq_plot[idx], power_plot[idx]),
                      textcoords="offset points",
@@ -146,12 +146,12 @@ def plot_fft(vol_series: pd.Series,
                      va="bottom",     # anchor from the bottom (so it sits above)
                      fontsize=8,      # smaller text
                      rotation=45,
-                     color=col)
+                     color="black")
 
-    plt.text(0.025, 0.025,
-             "Fundamental decade-long cycle removed",
-             transform=plt.gca().transAxes,
-             va="bottom", fontsize=8, color="gray")
+    # plt.text(0.025, 0.025,
+    #          "Fundamental decade-long cycle removed",
+    #          transform=plt.gca().transAxes,
+    #          va="bottom", fontsize=8, color="gray")
 
     plt.title(f"{title.splitlines()[0]}\n"
               "Low-pass < 2-day period\n"
