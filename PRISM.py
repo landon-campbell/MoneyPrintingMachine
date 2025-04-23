@@ -9,11 +9,8 @@ from scipy.signal import firwin, filtfilt, find_peaks
 
 def parse_args():
     p = argparse.ArgumentParser(description="FFT volume analyzer")
-    p.add_argument(
-        "--ticker",
-        default="AMZN",
-        help="Ticker symbol to fetch (e.g. AMZN)"
-    )
+    p.add_argument("--ticker", default="AMZN",
+                   help="Ticker symbol to fetch (e.g. AMZN)")
     return p.parse_args()
 
 def fetch_volume(ticker: str, start: str, end: str) -> pd.Series:
@@ -43,8 +40,8 @@ def low_pass_filter(data, cutoff, fs=1.0, requested_taps=101):
         padlen = 3 * len(taps)
 
     data_padded = np.pad(arr, padlen, mode="reflect")
-    filtered_padded = filtfilt(taps, 1.0, data_padded)
-    return filtered_padded[padlen:-padlen]
+    filtered = filtfilt(taps, 1.0, data_padded)
+    return filtered[padlen:-padlen]
 
 def plot_fft(vol_series: pd.Series,
              title: str,
@@ -69,16 +66,23 @@ def plot_fft(vol_series: pd.Series,
     mask      = periods <= max_period_days
     freq2     = freq_pos[mask]
     power2    = power[mask]
+    # calendar-day periods for annotation
     cal2      = periods[mask] * (7.0/5.0)
 
-    # drop first (fundamental) and last (Nyquist) from plotting
+    # drop first (fundamental) and last (Nyquist) bins
     freq_plot  = freq2[1:-1]
     power_plot = power2[1:-1]
     cal_plot   = cal2[1:-1]
 
+    # TRUNCATE: only keep up to 3 years (1095 days)  
+    keep       = cal_plot <= (3 * 365)
+    freq_plot  = freq_plot[keep]
+    power_plot = power_plot[keep]
+    cal_plot   = cal_plot[keep]
+
     plt.figure(figsize=(12,6))
 
-    # shade removed high-frequency (period < 2 d) due to data constraint
+    # shade removed high-frequency (period < 2 d)
     plt.axvspan(cutoff_freq, freq_plot.max(),
                 color='gray', alpha=0.2,
                 label='Removed: period < 2 d (data constraint)')
@@ -92,10 +96,13 @@ def plot_fft(vol_series: pd.Series,
     # plot amplitude vs. frequency (1/days)
     plt.plot(freq_plot, power_plot, lw=1)
 
-    # annotate top 9 peaks with days + weeks/months/years
+    # annotate top 9 peaks, left→right color alternation
     peaks, _ = find_peaks(power_plot)
     top = peaks[np.argsort(power_plot[peaks])][-9:]
-    for idx in top:
+    top = np.sort(top)
+
+    colors = ["red", "purple"]
+    for i, idx in enumerate(top):
         days = cal_plot[idx]
         if days > 366:
             label = f"{days:.1f} d ({days/365:.1f} yrs)"
@@ -107,23 +114,28 @@ def plot_fft(vol_series: pd.Series,
             label = f"{days:.1f} d ({wk:.1f} wks)"
         else:
             label = f"{days:.1f} d"
-        plt.scatter(freq_plot[idx], power_plot[idx], color="red", zorder=5)
-        plt.annotate(
-            label,
-            (freq_plot[idx], power_plot[idx]),
-            textcoords="offset points",
-            xytext=(0,8), ha="center", color="red"
-        )
 
-    # note about the dropped decade-long fundamental
+        yoff = 8 if (i % 2 == 0) else -12
+        col  = colors[i % 2]
+
+        plt.scatter(freq_plot[idx], power_plot[idx],
+                    color=col, zorder=5)
+        plt.annotate(label,
+                     (freq_plot[idx], power_plot[idx]),
+                     textcoords="offset points",
+                     xytext=(0, yoff),
+                     ha="center", color=col)
+
+    # note about dropped fundamental
     plt.text(0.05, 0.95,
              "Fundamental decade-long cycle removed",
              transform=plt.gca().transAxes,
              va="top", fontsize=8, color="gray")
 
-    plt.title(f"{title.splitlines()[0]}\n"
+    main_title = title.splitlines()[0]
+    plt.title(f"{main_title}\n"
               "Low-pass < 2-day period\n"
-              "(1/days axis; peak labels in calendar days)")
+              "(1/days axis; peaks in calendar days, truncated to 3 yrs)")
     plt.xscale("log")
     plt.xlabel("1/days (log scale)")
     plt.ylabel("Amplitude")
@@ -134,7 +146,7 @@ def plot_fft(vol_series: pd.Series,
 
 def main():
     args = parse_args()
-    ticker = args.ticker.upper()
+    ticker     = args.ticker.upper()
     start_date = "2014-01-01"
     end_date   = "2024-12-31"
 
