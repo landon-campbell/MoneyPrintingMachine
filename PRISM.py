@@ -1,87 +1,152 @@
 #!/usr/bin/env python3
 
+import argparse
 import yfinance as yf
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.signal import find_peaks
+from scipy.signal import firwin, filtfilt, find_peaks
+
+def parse_args():
+    p = argparse.ArgumentParser(description="FFT volume analyzer")
+    p.add_argument(
+        "--ticker",
+        default="AMZN",
+        help="Ticker symbol to fetch (e.g. AMZN)"
+    )
+    return p.parse_args()
 
 def fetch_volume(ticker: str, start: str, end: str) -> pd.Series:
-    """
-    Download raw (unadjusted) daily trading volume for the given ticker
-    between start and end dates. Returns a pandas Series indexed by date.
-    """
-    df = yf.download(
-        ticker,
-        start=start,
-        end=end,
-        progress=False,
-        auto_adjust=False,
-    )
-    return df["Volume"].dropna()
+    df = yf.download(ticker, start=start, end=end,
+                     progress=False, auto_adjust=False)
+    vol = df["Volume"].dropna().sort_index()
+    vol.index = pd.to_datetime(vol.index)
+    return vol.asfreq("B").ffill()
 
-def plot_fft(
-    vol_series: pd.Series,
-    title: str,
-    max_period_days: float,
-    color: str
-) -> None:
-    """
-    Compute FFT of the input volume series and plot:
-    - amplitude vs. period (in days, log scale on x-axis),
-    - annotate the ten strongest peaks up to max_period_days,
-    - use `color` for title, plot line, points, and annotations.
-    """
-    vol = vol_series.values
-    vol_centered = vol - np.mean(vol)
-    N = len(vol_centered)
+def low_pass_filter(data, cutoff, fs=1.0, requested_taps=101):
+    arr = np.asarray(data).squeeze()
+    if arr.ndim != 1:
+        raise ValueError(f"Expected 1-D input, got {arr.shape}")
+    N = len(arr)
 
-    fft_vals = np.fft.fft(vol_centered)
-    freq = np.fft.fftfreq(N, d=1.0)
-    pos = freq > 0
-    freq = freq[pos]
-    power = np.abs(fft_vals[pos])
+    numtaps = min(requested_taps, N - 1)
+    if numtaps % 2 == 0:
+        numtaps -= 1
+    nyq = fs / 2.0
+    cutoff_norm = min((cutoff/nyq)*0.99, 0.99)
 
-    periods = 1.0 / freq
-    periods = np.asarray(periods).ravel()
-    power = np.asarray(power).ravel()
+    taps = firwin(numtaps, cutoff_norm, window="hamming")
+    padlen = 3 * len(taps)
+    while numtaps > 3 and padlen >= N:
+        numtaps -= 2
+        taps = firwin(numtaps, cutoff_norm, window="hamming")
+        padlen = 3 * len(taps)
 
-    mask = periods <= max_period_days
-    periods = periods[mask]
-    power = power[mask]
+    data_padded = np.pad(arr, padlen, mode="reflect")
+    filtered_padded = filtfilt(taps, 1.0, data_padded)
+    return filtered_padded[padlen:-padlen]
 
-    peaks, _ = find_peaks(power)
-    if len(peaks) >= 10:
-        top = peaks[np.argsort(power[peaks])][-10:]
-    else:
-        top = peaks
+def plot_fft(vol_series: pd.Series,
+             title: str,
+             max_period_days: float,
+             cutoff_freq: float) -> None:
 
-    plt.figure(figsize=(12, 6))
-    plt.plot(periods, power, color=color)
-    plt.scatter(periods[top], power[top], color=color, zorder=5)
+    vals     = vol_series.values.astype(float)
+    centered = vals - vals.mean()
+    filt     = low_pass_filter(centered, cutoff=cutoff_freq)
+
+    N         = len(filt)
+    fft_vals  = np.fft.fft(filt)
+    freq      = np.fft.fftfreq(N, d=1.0)
+
+    pos       = freq > 0
+    freq_pos  = freq[pos]
+    fft_pos   = fft_vals[pos]
+
+    power     = np.abs(fft_pos)
+    periods   = 1.0 / freq_pos
+
+    mask      = periods <= max_period_days
+    freq2     = freq_pos[mask]
+    power2    = power[mask]
+    cal2      = periods[mask] * (7.0/5.0)
+
+    # drop first (fundamental) and last (Nyquist) from plotting
+    freq_plot  = freq2[1:-1]
+    power_plot = power2[1:-1]
+    cal_plot   = cal2[1:-1]
+
+    plt.figure(figsize=(12,6))
+
+    # shade removed high-frequency (period < 2 d) due to data constraint
+    plt.axvspan(cutoff_freq, freq_plot.max(),
+                color='gray', alpha=0.2,
+                label='Removed: period < 2 d (data constraint)')
+
+    # mark 2-day cutoff
+    plt.axvline(cutoff_freq, color='gray', linestyle='--', linewidth=1)
+    plt.text(cutoff_freq*1.02, plt.ylim()[1]*0.5,
+             '2 d period cutoff',
+             rotation=90, va='center', fontsize=8, color='gray')
+
+    # plot amplitude vs. frequency (1/days)
+    plt.plot(freq_plot, power_plot, lw=1)
+
+    # annotate top 9 peaks with days + weeks/months/years
+    peaks, _ = find_peaks(power_plot)
+    top = peaks[np.argsort(power_plot[peaks])][-9:]
     for idx in top:
-        plt.annotate(f"{periods[idx]:.1f} d",
-                     (periods[idx], power[idx]),
-                     textcoords="offset points", xytext=(0, 8),
-                     ha="center", color=color)
+        days = cal_plot[idx]
+        if days > 366:
+            label = f"{days:.1f} d ({days/365:.1f} yrs)"
+        elif 29 < days < 364:
+            mo = days / 30.0
+            label = f"{days:.1f} d ({mo:.1f} mo)"
+        elif 6 < days < 8:
+            wk = days / 7.0
+            label = f"{days:.1f} d ({wk:.1f} wks)"
+        else:
+            label = f"{days:.1f} d"
+        plt.scatter(freq_plot[idx], power_plot[idx], color="red", zorder=5)
+        plt.annotate(
+            label,
+            (freq_plot[idx], power_plot[idx]),
+            textcoords="offset points",
+            xytext=(0,8), ha="center", color="red"
+        )
 
+    # note about the dropped decade-long fundamental
+    plt.text(0.05, 0.95,
+             "Fundamental decade-long cycle removed",
+             transform=plt.gca().transAxes,
+             va="top", fontsize=8, color="gray")
+
+    plt.title(f"{title.splitlines()[0]}\n"
+              "Low-pass < 2-day period\n"
+              "(1/days axis; peak labels in calendar days)")
     plt.xscale("log")
-    plt.xlim(1, max_period_days)
-    plt.title(title, color=color)
-    plt.xlabel("Period (days, log scale)")
+    plt.xlabel("1/days (log scale)")
     plt.ylabel("Amplitude")
     plt.grid(alpha=0.3, which="both", linestyle="--")
+    plt.legend(loc="lower left")
     plt.tight_layout()
     plt.show()
 
 def main():
-    volume = fetch_volume("AMZN", "2014-01-01", "2024-12-31")
-    plot_fft(
-        volume,
-        title="AMZN Daily Volume FFT (2014–2024)",
-        max_period_days=3650,
-        color="blue"
-    )
+    args = parse_args()
+    ticker = args.ticker.upper()
+    start_date = "2014-01-01"
+    end_date   = "2024-12-31"
+
+    volume = fetch_volume(ticker, start_date, end_date)
+    print(f"N = {len(volume)} samples for {ticker} "
+          f"from {volume.index.min()} to {volume.index.max()}")
+
+    cutoff = 0.5  # 1/(2 d)
+    plot_fft(volume,
+             title=f"{ticker} Daily Volume FFT (2014–2024)",
+             max_period_days=3650,
+             cutoff_freq=cutoff)
 
 if __name__ == "__main__":
     main()
